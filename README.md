@@ -31,12 +31,13 @@ This is mathematically guaranteed by polynomial interpolation over a finite fiel
 
 ```
 shamir-secret-sharing/
-├── shamir_key.py      # Core tool — Shamir splitting and reconstruction
-├── prepare_secret.py  # Helper — guided passkey+password entry, auto-launches shamir_key.py
-├── requirements.txt   # cryptography>=41.0.0
-├── setup.sh           # One-time venv setup
-├── run.sh             # Hardened launcher (suppresses shell history, menu, clears screen)
-└── README.md          # This file
+├── shamir_key.py          # Core tool — Shamir splitting and reconstruction
+├── run_password_only.py   # Recommended entry point — password only, passkey managed separately
+├── prepare_secret.py      # Full entry point — guided passkey + password entry
+├── requirements.txt       # cryptography>=41.0.0
+├── setup.sh               # One-time venv setup
+├── run.sh                 # Hardened launcher (suppresses shell history, menu, clears screen)
+└── README.md              # This file
 ```
 
 ---
@@ -54,7 +55,7 @@ shamir-secret-sharing/
 ### 1. Clone and set up
 
 ```bash
-git clone https://github.com/bradles94550/Shamir_tools.git
+git clone https://github.com/YOUR_USERNAME/shamir-secret-sharing.git
 cd shamir-secret-sharing
 chmod +x setup.sh run.sh
 ./setup.sh
@@ -152,47 +153,61 @@ rm -P shares.txt
 
 ```
   What would you like to do?
-  1. Prepare a new secret and split into shares
-     (guided: enter passkey + password → auto-launches split tool)
+  1. Password only — enter your 64-char password, split into shares
+     (passkey field set to 'none'; each user manages their own auth)
 
-  2. Go straight to shamir_key.py
-     (for splitting a JSON string you already have, or reconstructing)
+  2. Passkey + password — enter both, split into shares
+     (full guided entry via prepare_secret.py)
+
+  3. Advanced / reconstruct — go straight to shamir_key.py
+     (paste a JSON string you already have, or reconstruct from shares)
 ```
 
 ---
 
-### Option 1 — Prepare and split (new secret)
+### Option 1 — Password only (recommended for most deployments)
 
-Choose **1** to launch `prepare_secret.py`. This walks you through:
+Choose **1** to launch `run_password_only.py`. This is the simplest and most common path — use it when each user or custodian manages their own passkey or authenticator separately, outside this tool.
 
-1. **Passkey entry** — hidden input (no echo), confirmed by re-entry
-2. **64-character password entry** — hidden input, validated for length and character set, confirmed by re-entry
-3. **Automatic handoff** — the JSON string is built in memory and injected directly into `shamir_key.py`. It is never written to disk by this step.
+The script:
+1. Prompts for your 64-character password — hidden input, confirmed by re-entry
+2. Validates length and character set
+3. Builds `{"passkey": "none", "password": "<your-password>"}` in memory
+4. Passes the JSON directly to `shamir_key.py` — never written to disk
 
 ```
-  PASSKEY
-  Passkey (hidden input): ••••••••••••
-  Confirm Passkey: ••••••••••••
-  [OK] Passkey accepted.
+  Password-Only Secret Entry
 
-  64-CHARACTER PASSWORD
-  Password (hidden input): ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-  Confirm Password: ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-  [OK] Password accepted — 64 characters, all valid.
+  Note: The passkey/authenticator field is managed separately
+  per user. This script only captures your 64-character password.
 
-  Launching shamir_key.py — Step 2 of 2
+  Password (hidden): ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+  Confirm password:  ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+  [OK] Password accepted — 64 characters, valid.
+
+  Handing off to shamir_key.py...
 ```
 
-`shamir_key.py` then takes over with the standard splitting prompts (encryption passphrase, N, K).
+`shamir_key.py` then takes over with the standard splitting prompts (optional encryption passphrase, N, K).
+
+> **Why `passkey: "none"`?** The JSON schema requires both fields. Setting passkey to the literal string `"none"` is an explicit, unambiguous placeholder — it signals intent clearly to anyone who reconstructs the secret later. If your deployment evolves to include passkeys, you can switch to option 2.
 
 ---
 
-### Option 2 — Direct access to `shamir_key.py`
+### Option 2 — Passkey + password (full guided entry)
 
-Choose **2** to go straight to `shamir_key.py`. Use this when:
+Choose **2** to launch `prepare_secret.py`. Use this when you want to include a passkey, passphrase, or account identifier alongside the password in the secret — for example, a TOTP seed, account ID, or site-specific passphrase.
+
+Both fields use hidden input with confirmation. The JSON is built in memory and injected directly into `shamir_key.py`.
+
+---
+
+### Option 3 — Advanced / reconstruct
+
+Choose **3** to go straight to `shamir_key.py`. Use this when:
 
 - You are **reconstructing** a secret from shares
-- You already have a JSON string prepared and want to split it manually
+- You already have a JSON string prepared
 
 ```
 What would you like to do?
@@ -204,25 +219,21 @@ What would you like to do?
 
 ### Creating shares (inside `shamir_key.py`)
 
-When creating, you will be prompted to:
+Regardless of which entry point you use, once inside `shamir_key.py` for creating shares you will be prompted to:
 
-1. **Paste your secret as a single-line JSON string** (if not coming from `prepare_secret.py`):
-   ```json
-   {"passkey": "your-passkey-here", "password": "your-exactly-64-character-password-here-padded-ok"}
-   ```
-   The `password` field must be exactly 64 characters.
+1. **Optionally encrypt** the JSON with a passphrase (AES-256-GCM) before splitting — a second independent protection layer. Custodians with K shares still cannot reconstruct the secret without this passphrase.
 
-2. **Optionally encrypt the JSON with a passphrase** (AES-256-GCM) before splitting. Custodians with K shares still cannot reconstruct the secret without also knowing this passphrase — a second independent layer of protection.
+2. **Choose N** — total shares to generate (2–20)
 
-3. **Choose N** (total shares, 2–20) and **K** (shares required to reconstruct, 2–N)
+3. **Choose K** — shares required to reconstruct (2–N)
 
-The tool then verifies **every possible K-subset** before displaying anything, then prints shares as base85-encoded strings.
+The tool verifies **every possible K-subset** before displaying anything, then prints shares as base85-encoded strings.
 
 ---
 
 ### Reconstructing the secret
 
-Choose option **2** from the `run.sh` menu, then option **2** inside `shamir_key.py`:
+Choose option **3** from the `run.sh` menu, then option **2** inside `shamir_key.py`:
 
 ```
 How many shares are you providing?: 3
@@ -236,7 +247,7 @@ Paste share #2: 0sz4PumG$8TL8}hHUO3Y...
 Paste share #3: 0{~0_0{|@m?EoDBx&Q?L...
   [OK] Share index 3 accepted.
 
-  passkey  : your-passkey-here
+  passkey  : none
   password : your-64-character-password-here...
 ```
 

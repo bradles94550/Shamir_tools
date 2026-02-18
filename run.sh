@@ -46,21 +46,27 @@ echo ""
 echo "  [INFO] Shell history is disabled for this session."
 echo ""
 echo "  What would you like to do?"
-echo "  1. Prepare a new secret and split into shares"
-echo "     (guided: enter passkey + password → auto-launches split tool)"
+echo "  1. Password only — enter your 64-char password, split into shares"
+echo "     (passkey field set to 'none'; each user manages their own auth)"
 echo ""
-echo "  2. Go straight to shamir_key.py"
-echo "     (for splitting a JSON string you already have, or reconstructing)"
+echo "  2. Passkey + password — enter both, split into shares"
+echo "     (full guided entry via prepare_secret.py)"
 echo ""
-printf "  Enter 1 or 2: "
+echo "  3. Advanced / reconstruct — go straight to shamir_key.py"
+echo "     (paste a JSON string you already have, or reconstruct from shares)"
+echo ""
+printf "  Enter 1, 2, or 3: "
 read -r CHOICE
 echo ""
 
 case "$CHOICE" in
     1)
-        python3 prepare_secret.py
+        python3 run_password_only.py
         ;;
     2)
+        python3 prepare_secret.py
+        ;;
+    3)
         python3 shamir_key.py
         ;;
     *)
