@@ -54,7 +54,7 @@ shamir-secret-sharing/
 ### 1. Clone and set up
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/shamir-secret-sharing.git
+git clone https://github.com/bradles94550/Shamir_tools.git
 cd shamir-secret-sharing
 chmod +x setup.sh run.sh
 ./setup.sh
