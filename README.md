@@ -55,8 +55,8 @@ shamir-secret-sharing/
 ### 1. Clone and set up
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/shamir-secret-sharing.git
-cd shamir-secret-sharing
+git clone https://github.com/bradles94550/Shamir_tools.git
+cd Shamir_tools
 chmod +x setup.sh run.sh
 ./setup.sh
 ```
@@ -171,19 +171,24 @@ Choose **1** to launch `run_password_only.py`. This is the simplest and most com
 
 The script:
 1. Prompts for your 64-character password — hidden input, confirmed by re-entry
-2. Validates length and character set
-3. Builds `{"passkey": "none", "password": "<your-password>"}` in memory
-4. Passes the JSON directly to `shamir_key.py` — never written to disk
+2. Optionally prompts for your TOTP seed (e.g. AWS MFA) — 64-character Base32 string, hidden input, skip by pressing Enter
+3. Validates both inputs
+4. Builds the JSON in memory and passes it directly to `shamir_key.py` — never written to disk
 
 ```
   Password-Only Secret Entry
 
-  Note: The passkey/authenticator field is managed separately
-  per user. This script only captures your 64-character password.
-
   Password (hidden): ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
   Confirm password:  ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
   [OK] Password accepted — 64 characters, valid.
+
+  TOTP SEED (optional)
+  Expected format: 64-character Base32 string (A-Z and 2-7).
+  Press Enter to skip.
+
+  TOTP seed (hidden, or Enter to skip): ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+  Confirm TOTP seed: ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+  [OK] TOTP seed accepted (64 characters, Base32).
 
   Handing off to shamir_key.py...
 ```
@@ -191,6 +196,8 @@ The script:
 `shamir_key.py` then takes over with the standard splitting prompts (optional encryption passphrase, N, K).
 
 > **Why `passkey: "none"`?** The JSON schema requires both fields. Setting passkey to the literal string `"none"` is an explicit, unambiguous placeholder — it signals intent clearly to anyone who reconstructs the secret later. If your deployment evolves to include passkeys, you can switch to option 2.
+
+> **TOTP seed recovery note:** When reconstructing, the seed is displayed as the raw Base32 string. Most authenticator apps (Google Authenticator, Authy, 1Password) accept manual Base32 entry directly — no conversion needed. Document this step in your recovery runbook so custodians know what to do with it.
 
 ---
 
@@ -247,8 +254,9 @@ Paste share #2: 0sz4PumG$8TL8}hHUO3Y...
 Paste share #3: 0{~0_0{|@m?EoDBx&Q?L...
   [OK] Share index 3 accepted.
 
-  passkey  : none
-  password : your-64-character-password-here...
+  passkey   : none
+  password  : your-64-character-password-here...
+  totp_seed : JBSWY3DPEHPK3PXP...  (Base32, 64 chars)
 ```
 
 ---

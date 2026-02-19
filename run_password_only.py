@@ -57,7 +57,7 @@ def validate_password(pw: str) -> list:
     return errors
 
 # ---------------------------------------------------------------------------
-# Collect password
+# Collect password and optional TOTP seed
 # ---------------------------------------------------------------------------
 def collect_password() -> str:
     print()
@@ -66,12 +66,9 @@ def collect_password() -> str:
     print("═" * 60)
     print(f"""
 {INFO('Note:')} The passkey/authenticator field is managed separately
-  per user. This script only captures your 64-character password,
-  wraps it in the required format, and passes it to shamir_key.py.
-
-  The passkey field will be set to "none" in the JSON. If your
-  deployment uses a passkey, add it to the JSON manually or use
-  prepare_secret.py instead.
+  per user. This script captures your 64-character password and
+  optionally your TOTP seed, wraps them in the required format,
+  and passes everything directly to shamir_key.py.
 
   Password requirements:
     • Exactly 64 characters
@@ -95,6 +92,32 @@ def collect_password() -> str:
 
         print(OK("  [OK] Password accepted — 64 characters, valid.\n"))
         return pw
+
+
+def collect_totp_seed() -> str:
+    """Prompt for optional TOTP seed. Returns empty string if skipped."""
+    print("─" * 60)
+    print(BOLD("  TOTP SEED (optional)"))
+    print(f"""
+  {INFO('Do you have a TOTP seed to include? (e.g. AWS MFA seed)')}
+  Expected format: 64-character Base32 string (A-Z and 2-7).
+  This will be stored alongside the password in the secret JSON.
+  Press Enter with no value to skip.
+""")
+
+    seed = getpass("  TOTP seed (hidden, or Enter to skip): ").strip()
+    if not seed:
+        print(INFO("  [SKIP] No TOTP seed provided.\n"))
+        return ""
+
+    seed2 = getpass("  Confirm TOTP seed: ").strip()
+    if seed != seed2:
+        print(ERR("  [ERROR] TOTP seeds do not match."))
+        print(WARN("  [WARN] Skipping TOTP seed to avoid storing a mistyped value.\n"))
+        return ""
+
+    print(OK(f"  [OK] TOTP seed accepted ({len(seed)} characters, Base32).\n"))
+    return seed
 
 # ---------------------------------------------------------------------------
 # Launch shamir_key.py via pty, injecting mode + JSON
@@ -225,15 +248,21 @@ def _fallback(json_string: str):
 def main():
     try:
         password = collect_password()
+        totp_seed = collect_totp_seed()
     except KeyboardInterrupt:
         print("\n\n  Aborted.")
         sys.exit(0)
 
-    # Build minimal JSON — passkey set to "none" as explicit placeholder
-    payload = json.dumps({"passkey": "none", "password": password}, separators=(",", ":"))
+    # Build JSON — passkey is "none" as explicit placeholder
+    secret = {"passkey": "none", "password": password}
+    if totp_seed:
+        secret["totp_seed"] = totp_seed
+    payload = json.dumps(secret, separators=(",", ":"))
 
-    # Scrub password from local variable as soon as it's in the JSON string
+    # Scrub sensitive locals immediately
     del password
+    del totp_seed
+    del secret
 
     try:
         launch_shamir(payload)

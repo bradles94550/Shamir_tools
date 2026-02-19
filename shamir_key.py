@@ -201,11 +201,11 @@ def flow_create():
 
     print("""
 You will be asked to provide a JSON string containing your secret data.
-Example format:
-    {
-      "passkey": "your-passkey-here",
-      "password": "your-64-char-password-here"
-    }
+Example format (password only):
+    {"passkey":"none","password":"your-64-char-password-here"}
+
+Example format (with optional TOTP seed):
+    {"passkey":"none","password":"your-64-char-password-here","totp_seed":"your-seed-here"}
 """)
 
     # Collect the secret JSON
@@ -217,6 +217,9 @@ Example format:
         parsed = json.loads(raw_json)
         assert "passkey" in parsed and "password" in parsed, "JSON must contain 'passkey' and 'password' fields"
         assert len(parsed["password"]) == 64, f"'password' must be exactly 64 characters (got {len(parsed['password'])})"
+        # totp_seed is optional — no length/format constraint, store as-is
+        if "totp_seed" in parsed:
+            assert isinstance(parsed["totp_seed"], str) and parsed["totp_seed"], "'totp_seed' must be a non-empty string"
     except (json.JSONDecodeError, AssertionError) as e:
         print(f"\n[ERROR] Invalid input: {e}")
         sys.exit(1)
@@ -334,8 +337,10 @@ def flow_reconstruct():
     print("  RECONSTRUCTED SECRET")
     separator()
     parsed = json.loads(secret_str)
-    print(f"\n  passkey  : {parsed.get('passkey', '<not found>')}")
-    print(f"  password : {parsed.get('password', '<not found>')}")
+    print(f"\n  passkey   : {parsed.get('passkey', '<not found>')}")
+    print(f"  password  : {parsed.get('password', '<not found>')}")
+    if "totp_seed" in parsed:
+        print(f"  totp_seed : {parsed.get('totp_seed')}  (Base32, {len(parsed['totp_seed'])} chars)")
     print()
 
     # Optionally save to file
